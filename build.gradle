@@ -1,0 +1,63 @@
+plugins {
+    alias(libs.plugins.java)
+    alias(libs.plugins.quarkus)
+}
+
+
+
+dependencies {
+    // Pipeline Dev Services extension (automatic compose infrastructure setup)
+    implementation 'io.pipeline:quarkus-pipeline-devservices:1.0.0-SNAPSHOT'
+
+    implementation platform(project(':bom'))
+    implementation 'io.quarkus:quarkus-grpc'
+    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-smallrye-health'
+    implementation 'io.quarkus:quarkus-smallrye-stork'
+
+    // REST API dependencies
+    implementation 'io.quarkus:quarkus-rest'
+    implementation 'io.quarkus:quarkus-hibernate-validator'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
+    
+    // Service Discovery dependencies for Consul
+    implementation 'io.smallrye.stork:stork-service-discovery-consul'
+    implementation 'io.smallrye.reactive:smallrye-mutiny-vertx-consul-client'
+    
+    // OpenSearch Java Client
+    implementation libs.opensearch.java
+
+    // Redis Client for distributed locking
+    implementation 'io.quarkus:quarkus-redis-client'
+
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+
+    implementation 'io.pipeline:grpc-stubs:1.0.0-SNAPSHOT'
+    implementation 'io.pipeline:pipeline-commons'
+    implementation 'io.pipeline:pipeline-api'
+    implementation 'io.pipeline:data-util'
+    implementation 'io.pipeline:dynamic-grpc'
+    implementation 'io.pipeline:dynamic-grpc-registration-clients'
+}
+
+group 'io.pipeline.module'
+version '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+test {
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+}
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
