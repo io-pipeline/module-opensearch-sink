@@ -1,17 +1,19 @@
 package io.pipeline.module.opensearchsink;
 
-import io.pipeline.api.annotation.PipelineAutoRegister;
 import io.pipeline.common.service.SchemaExtractorService;
+import io.pipeline.data.v1.PipeDoc;
 import io.pipeline.data.module.*;
 import io.pipeline.module.opensearchsink.config.opensearch.BatchOptions;
 import io.pipeline.opensearch.v1.*;
+import io.quarkus.grpc.GrpcClient;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.jboss.logging.Logger;
 
+@Singleton
 @GrpcService
-@PipelineAutoRegister(moduleType = "sink", useHttpPort = true)
 public class OpenSearchSinkServiceImpl implements PipeStepProcessor {
 
     private static final Logger LOG = Logger.getLogger(OpenSearchSinkServiceImpl.class);
@@ -19,7 +21,7 @@ public class OpenSearchSinkServiceImpl implements PipeStepProcessor {
     @Inject
     SchemaExtractorService schemaExtractorService;
 
-    @Inject
+    @GrpcClient("opensearch-manager")
     MutinyOpenSearchManagerServiceGrpc.MutinyOpenSearchManagerServiceStub openSearchManager;
 
     @Override
@@ -32,7 +34,7 @@ public class OpenSearchSinkServiceImpl implements PipeStepProcessor {
         }
 
         OpenSearchDocument osDoc = convertToOpenSearchDocument(request.getDocument());
-        String indexName = "pipeline-" + request.getDocument().getDocumentType().toLowerCase();
+        String indexName = "pipeline-" + request.getDocument().getSearchMetadata().getDocumentType().toLowerCase();
 
         return openSearchManager.indexDocument(IndexDocumentRequest.newBuilder()
                 .setIndexName(indexName)
@@ -45,20 +47,20 @@ public class OpenSearchSinkServiceImpl implements PipeStepProcessor {
                 .build());
     }
 
-    private OpenSearchDocument convertToOpenSearchDocument(io.pipeline.data.model.PipeDoc pipeDoc) {
+    private OpenSearchDocument convertToOpenSearchDocument(PipeDoc pipeDoc) {
         OpenSearchDocument.Builder builder = OpenSearchDocument.newBuilder()
-            .setOriginalDocId(pipeDoc.getId())
-            .setDocType(pipeDoc.getDocumentType())
-            //.setCreatedBy(pipeDoc.getCreatedBy())
-            //.setCreatedAt(pipeDoc.getCreatedDate())
-            .setLastModifiedAt(pipeDoc.getLastModifiedDate());
+            .setOriginalDocId(pipeDoc.getDocId())
+            .setDocType(pipeDoc.getSearchMetadata().getDocumentType())
+            .setLastModifiedAt(pipeDoc.getSearchMetadata().getLastModifiedDate());
 
-        if (pipeDoc.hasTitle()) builder.setTitle(pipeDoc.getTitle());
-        if (pipeDoc.hasBody()) builder.setBody(pipeDoc.getBody());
-        if (pipeDoc.getKeywordsCount() > 0) builder.addAllTags(pipeDoc.getKeywordsList());
+        if (pipeDoc.getSearchMetadata().hasTitle()) builder.setTitle(pipeDoc.getSearchMetadata().getTitle());
+        if (pipeDoc.getSearchMetadata().hasBody()) builder.setBody(pipeDoc.getSearchMetadata().getBody());
+        if (pipeDoc.getSearchMetadata().hasKeywords() && pipeDoc.getSearchMetadata().getKeywords().getKeywordCount() > 0) {
+            builder.addAllTags(pipeDoc.getSearchMetadata().getKeywords().getKeywordList());
+        }
 
         // Convert embeddings
-        for (var result : pipeDoc.getSemanticResultsList()) {
+        for (var result : pipeDoc.getSearchMetadata().getSemanticResultsList()) {
             for (var chunk : result.getChunksList()) {
                 if (chunk.hasEmbeddingInfo() && chunk.getEmbeddingInfo().getVectorCount() > 0) {
                     builder.addEmbeddings(Embedding.newBuilder()
@@ -75,22 +77,18 @@ public class OpenSearchSinkServiceImpl implements PipeStepProcessor {
         return builder.build();
     }
 
-    @Override
-    public Uni<ServiceRegistrationResponse> getServiceRegistration(RegistrationRequest request) {
-        ServiceRegistrationResponse.Builder responseBuilder = ServiceRegistrationResponse.newBuilder()
-            .setModuleName("opensearch-sink")
-            .setCapabilities(Capabilities.newBuilder().addTypes(CapabilityType.SINK).build())
-            .setHealthCheckPassed(true)
-            .setHealthCheckMessage("Service is running.");
-
-        schemaExtractorService.extractSchemaForClass(BatchOptions.class)
-            .ifPresent(responseBuilder::setJsonConfigSchema);
-
-        return Uni.createFrom().item(responseBuilder.build());
-    }
 
     @Override
     public Uni<ModuleProcessResponse> testProcessData(ModuleProcessRequest request) {
         return processData(request);
+    }
+
+    @Override
+    public Uni<ServiceRegistrationMetadata> getServiceRegistration(RegistrationRequest request) {
+        // Using declarative registration via application.properties instead
+        return Uni.createFrom().item(ServiceRegistrationMetadata.newBuilder()
+                .setModuleName("opensearch-sink")
+                .setVersion("1.0.0-SNAPSHOT")
+                .build());
     }
 }
