@@ -9,7 +9,7 @@ dependencies {
     // Pipeline Dev Services extension (automatic compose infrastructure setup)
     implementation 'io.pipeline:quarkus-pipeline-devservices:1.0.0-SNAPSHOT'
 
-    implementation platform(project(':bom'))
+    implementation platform('io.pipeline:pipeline-bom:1.0.0-SNAPSHOT')
     implementation 'io.quarkus:quarkus-grpc'
     implementation 'io.quarkus:quarkus-arc'
     implementation 'io.quarkus:quarkus-smallrye-health'
